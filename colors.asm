@@ -1,3 +1,5 @@
+	#based on algorithm from https://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum/22681410 by Spektre
+	#assuming max width and height of 512 pixels
 	.data
 mes0:	.asciiz "Height [1..512]: "
 mes1:	.asciiz "Width [3..512]: "
@@ -20,7 +22,7 @@ skip0:
 	li $v0, 5
 	syscall
 	move $t6, $v0 #width
-	bltu $t6, 1, fin
+	bltu $t6, 3, fin
 	bleu $t6, 512, skip1
 	li $t6, 512
 skip1:
@@ -28,7 +30,7 @@ skip1:
 	sll $s0, $t0, 16 #wave length in 16.16
 	li $t1, 301 #spectrum length [nm]
 	sll $t1, $t1, 16
-	divu $t1, $t1, $t7 #nanometers per pixel
+	divu $t1, $t1, $t6 #nanometers per pixel
 	li $t8, 0x10010000 #memory pointer
 	li $t9, 0 #loop counter
 loop:
@@ -215,13 +217,13 @@ store_line:
 	li $s1, 0 #loop2 counter
 	move $s2, $t8 #temp memory pointer
 loop2:
-	bgeu $s1, $t6, next
+	bgeu $s1, $t7, next
 	sw $t2, ($s2)
-	addiu $s2, $s2, 4
+	addiu $s2, $s2, 2048
 	addiu $s1, $s1, 1
 	b loop2
 next:
-	addu $t8, $t8, 2048
+	addu $t8, $t8, 4
 	addiu $t9, $t9, 1
 	subu $s0, $s0, $t1
 	b loop
