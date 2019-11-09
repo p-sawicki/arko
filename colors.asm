@@ -26,19 +26,19 @@ skip0:
 	bleu $t6, 512, skip1
 	li $t6, 512
 skip1:
-	li $t0, 700 #wave length [nm]
+	li $t0, 685 #wave length [nm]
 	sll $s0, $t0, 16 #wave length in 16.16
-	li $t1, 301 #spectrum length [nm]
+	li $t1, 278 #spectrum length [nm]
 	sll $t1, $t1, 16
 	divu $t1, $t1, $t6 #nanometers per pixel
 	li $t8, 0x10010000 #memory pointer
 	li $t9, 0 #loop counter
 loop:
 	srl $t0, $s0, 16
-	bgeu $t0, 400, skip2
-	li $t0, 400
+	bgeu $t0, 408, skip2
+	li $t0, 408
 skip2:
-	bgeu $t9, $t7, fin
+	bgeu $t9, $t6, fin
 	li $t2, 0 #R
 	li $t3, 0 #G
 	li $t4, 0 #B
