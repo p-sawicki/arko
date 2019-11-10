@@ -1,5 +1,12 @@
 	#based on algorithm from https://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum/22681410 by Spektre
 	#assuming max width and height of 512 pixels
+	.macro _mulu (%r1, %r2, %r3, %r4)
+	mulu %r1, %r2, %r3
+	srl %r1, %r1, 16
+	mfhi %r4
+	sll %r4, %r4, 16
+	addu %r1, %r1, %r4
+	.end_macro
 	.data
 mes0:	.asciiz "Height [1..512]: "
 mes1:	.asciiz "Width [3..512]: "
@@ -26,18 +33,15 @@ skip0:
 	bleu $t6, 512, skip1
 	li $t6, 512
 skip1:
-	li $t0, 685 #wave length [nm]
+	li $t0, 650 #wave length [nm]
 	sll $s0, $t0, 16 #wave length in 16.16
-	li $t1, 278 #spectrum length [nm]
+	li $t1, 243 #spectrum length [nm]
 	sll $t1, $t1, 16
 	divu $t1, $t1, $t6 #nanometers per pixel
 	li $t8, 0x10010000 #memory pointer
 	li $t9, 0 #loop counter
 loop:
 	srl $t0, $s0, 16
-	bgeu $t0, 408, skip2
-	li $t0, 408
-skip2:
 	bgeu $t9, $t6, fin
 	li $t2, 0 #R
 	li $t3, 0 #G
@@ -54,13 +58,10 @@ skip2:
 	li $s1, 10
 	divu $t5, $t5, $s1
 	li $s1, 21627 #approx. 0.33 in 16.16
-	mulu $t2, $t5, $s1
-	srl $t2, $t2, 16
+	_mulu($t2, $t5, $s1, $s2)
 	li $s1, 13107 #approx. 0.2 in 16.16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t2, $t2, $s1
 	b green
 R0:
@@ -71,10 +72,8 @@ R0:
 	divu $t5, $t5, $s1
 	li $t2, 9175 #approx. 0.14 in 16.16
 	li $s1, 8520 #approx. 0.13 in 16.16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t2, $t2, $s1
 	b green
 R1:
@@ -84,10 +83,8 @@ R1:
 	li $s1, 50
 	divu $t5, $t5, $s1
 	li $s1, 129761 #approx. 1.98 in 16.16
-	mulu $t2, $s1, $t5
-	srl $t2, $t2, 16
-	mulu $s1, $t5, $t5
-	srl $s1, $s1, 16
+	_mulu($t2, $s1, $t5, $s2)
+	_mulu($s1, $t5, $t5, $s2)
 	subu $t2, $t2, $s1
 	b green
 R2:
@@ -98,14 +95,11 @@ R2:
 	divu $t5, $t5, $s1
 	li $t2, 64225 #approx. 0.98 in 16.16
 	li $s1, 3932 #approx. 0.06 in 16.16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
 	addu $t2, $t2, $s1
 	li $s1, 26214 #approx 0.4 in 16.16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t2, $t2, $s1
 	b green
 R3:
@@ -116,14 +110,11 @@ R3:
 	divu $t5, $t5, $s1
 	li $t2, 42598 #approx 0.65 in 16.16
 	li $s1, 55050 #approx 0.84 in 16.16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t2, $t2, $s1
 	li $s1, 13107 #0.2
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	addu $t2, $t2, $s1
 green:
 	bgeu $t0, 640, blue
@@ -138,10 +129,8 @@ G0:
 	li $s1, 60
 	divu $t5, $t5, $s1
 	li $s1, 52429 #0.8
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $t3, $s1, $t5
-	srl $t3, $t3, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($t3, $s1, $t5, $s2)
 	b blue
 G1:
 	li $s1, 475
@@ -151,14 +140,11 @@ G1:
 	divu $t5, $t5, $s1
 	li $t3, 52439 #0.8
 	li $s1, 49807 #0.76
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
 	addu $t3, $t3, $s1
 	li $s1, 52439 #0.8
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t3, $t3, $s1
 	b blue
 G2:
@@ -169,8 +155,7 @@ G2:
 	divu $t5, $t5, $s1
 	li $t3, 55050 #0.84
 	li $s1, 54050 #0.83
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t3, $t3, $s1
 blue:
 	bgeu $t0, 561, store_line
@@ -181,13 +166,10 @@ blue:
 	li $s1, 75
 	divu $t5, $t5, $s1
 	li $s1, 144179 #2.2
-	mulu $t4, $s1, $t5
-	srl $t4, $t4, 16
+	_mulu($t4, $s1, $t5, $s2)
 	li $s1, 98304 #1.5
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	subu $t4, $t4, $s1
 	b store_line
 B0:
@@ -199,10 +181,8 @@ B0:
 	li $t4, 46875 #0.7
 	subu $t4, $t4, $t5
 	li $s1, 19661 #0.3
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
-	mulu $s1, $s1, $t5
-	srl $s1, $s1, 16
+	_mulu($s1, $s1, $t5, $s2)
+	_mulu($s1, $s1, $t5, $s2)
 	addu $t4, $t4, $s1
 store_line:
 	mulu $t2, $t2, 255
