@@ -30,7 +30,8 @@ skip1:
 	sll $s0, $t0, 16 #wave length in 16.16
 	li $t1, 270 #spectrum length [nm]
 	sll $t1, $t1, 16
-	divu $t1, $t1, $t6 #nanometers per pixel
+	subu $s1, $t6, 1
+	divu $t1, $t1, $s1 #nanometers per pixel
 	li $t8, 0x10000000 #memory pointer
 	li $t9, 0 #loop counter
 loop:
