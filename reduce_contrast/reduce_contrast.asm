@@ -3,68 +3,105 @@ section .TEXT
 reduce_contrast:
 	push ebp
 	mov ebp, esp
-	sub esp, 4
 	push ebx
-	mov eax, [ebp + 8] ; file buffer
-	mov cx, [ebp + 12] ; rfactor
-	shl cx, 1; rfactor / 128 in 8.8
-	mov [ebp - 4], cx
-	mov edx, [eax + 18] ; image width
+	mov eax, [ebp + 12] ; rfactor
+	shl eax, 1 ; rfactor / 128 in 8.8
+	mov ecx, 256
+	sub ecx, eax ; 1 - rfactor / 128
+	mov ebx, ecx
+	shl ecx, 16
+	or ecx, ebx ; 2 words of (1 - rfactor / 128)
+	mov ebx, [ebp + 8] ; file buffer
+	mov edx, [ebx + 18] ; image width
 	and edx, 3 ; image width % 4
-	add edx, [eax + 18]
-	push eax
-	mov eax, [eax + 22] ; image height
-	mul edx
-	mov edx, eax ; image height * image width rounded to account for padding bytes
-	pop eax
-	lea edx, [edx + edx * 2] ; 3 bytes per pixel	
-	add eax, [eax + 10] ; pixel data offset
-	vpxor ymm0, ymm0, ymm0
-	mov bx, 256
-	sub bx, cx
-	mov cx, bx
-	xor ebx, ebx
-	mov [ebp - 2], word 128
-	vpbroadcastw ymm5, [ebp - 4] ; rfactor / 128 in every word
-	vpbroadcastw ymm4, [ebp - 2] ; 128 in every word
+	add edx, [ebx + 18] ; image width rounded up to mul of 4
+	mov eax, [ebx + 22] ; image height
+	mul edx ; pixel amount
+	lea eax, [eax + eax * 2] ; 3 bytes per pixel
+	add ebx, [ebx + 10] ; pixel data offset
+	mov edx, 0x00800080 ; 2 words of 128
+	movd xmm1, edx
+	pshufd xmm1, xmm1, 0 ; 8 words of 128
+	movd xmm2, ecx	
+	pshufd xmm2, xmm2, 0 ; 8 words of (1 - rfactor / 128)
+	pxor xmm0, xmm0
 loop:
-	vpmovzxbw ymm1, [eax] ; converts 16 bytes to words
-	vpcmpgtw ymm2, ymm1, ymm4 ; mask for words greater than 128
-	vpand ymm3, ymm1, ymm2 ; >128	
-	vpsubw ymm3, ymm3, ymm4
-	vpmullw ymm3, ymm3, ymm5
-	vpsrlw ymm3, ymm3, 8
-	vpaddw ymm3, ymm3, ymm4
-	vpsubw ymm1, ymm4, ymm1
-	vpmullw ymm1, ymm1, ymm5
-	vpsrlw ymm1, ymm1, 8
-	vpsubw ymm1, ymm4, ymm1
-	vpandn ymm1, ymm2, ymm1
-	vpand ymm3, ymm3, ymm2
-	vpaddw ymm1, ymm1, ymm3
-	vpmovzxbw ymm6, [eax + 16]
-	vpcmpgtw ymm2, ymm6, ymm4
-	vpand ymm3, ymm6, ymm2
-	vpsubw ymm3, ymm3, ymm4
-	vpmullw ymm3, ymm3, ymm5
-	vpsrlw ymm3, ymm3, 8
-	vpaddw ymm3, ymm3, ymm4
-	vpsubw ymm6, ymm4, ymm6
-	vpmullw ymm6, ymm6, ymm5
-	vpsrlw ymm6, ymm6, 8
-	vpsubw ymm6, ymm4, ymm6
-	vpandn ymm6, ymm2, ymm6
-	vpand ymm3, ymm3, ymm2
-	vpaddw ymm6, ymm6, ymm3
-	vpackuswb ymm1, ymm1, ymm6
-	vpermq ymm1, ymm1, 0xD8	
-	vmovdqu [eax], ymm1
-	add eax, 16 
-	add ebx, 16 
-	cmp ebx, edx 
-	jl loop
+	cmp eax, 16
+	jl too_short
+	movdqu xmm3, [ebx] ; get 16 bytes
+	movdqu xmm4, xmm3
+	punpcklbw xmm4, xmm0 ; low 8 bytes extended into words
+	movdqu xmm5, xmm4
+	pcmpgtw xmm5, xmm1 ; mask for words > 128
+	movdqu xmm6, xmm4 ; words > 128
+	psubw xmm6, xmm1 ; pixel - 128
+	pmullw xmm6, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
+	psrlw xmm6, 8
+	paddw xmm6, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
+	movdqu xmm7, xmm1 ; words <= 128 in xmm4
+	psubw xmm7, xmm4 ; 128 - pixel
+	pmullw xmm7, xmm2 ; (1 - rfactor / 128) * (128 - pixel)
+	psrlw xmm7, 8
+	movdqu xmm4, xmm1
+	psubw xmm4, xmm7 ; 128 - (1 - rfactor / 128) * (128 - pixel)
+	pand xmm6, xmm5 ; words > 128
+	pandn xmm5, xmm4 ; words <= 128
+	por xmm5, xmm6 ; all words
+
+	punpckhbw xmm3, xmm0 ; high 8 bytes extended into words
+	movdqu xmm4, xmm3
+	pcmpgtw xmm4, xmm1 ; mask for words > 128
+	movdqu xmm6, xmm3 ; words > 128
+	psubw xmm6, xmm1 ; pixel - 128
+	pmullw xmm6, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
+	psrlw xmm6, 8
+	paddw xmm6, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
+	movdqu xmm7, xmm1 ; words <= 128 in xmm3
+	psubw xmm7, xmm3 ; 128 - pixel
+	pmullw xmm7, xmm2 ; (1 - rfactor / 128) * (128 - pixel)
+	psrlw xmm7, 8
+	movdqu xmm3, xmm1
+	psubw xmm3, xmm7 ; 128 - (1 - rfactor / 128) * (128 - pixel)
+	pand xmm6, xmm4 ; words > 128
+	pandn xmm4, xmm3 ; words <= 128
+	por xmm4, xmm6 ; all words
+
+	packuswb xmm5, xmm4 ; convert words back into bytes
+	movdqu [ebx], xmm5 ; store 16 bytes
+	sub eax, 16
+	add ebx, 16
+	jmp loop	 
+too_short:
+	push edi
+	mov edi, eax
+loop2:
+	test edi, edi
+	je fin
+	movzx ax, [ebx]
+	cmp ax, 128
+	jle less
+	sub ax, 128
+	mul cx
+	shr ax, 8
+	add ax, 128
+	jmp next
+less:
+	mov dx, ax
+	mov ax, 128
+	sub ax, dx
+	mul cx
+	shr ax, 8
+	mov dx, ax
+	mov ax, 128		
+	sub ax, dx
+next:
+	mov [ebx], al
+	inc ebx
+	dec edi
+	jmp loop2
 fin:
+	pop edi
 	pop ebx
 	mov esp, ebp
 	pop ebp
-	ret	
+	ret
