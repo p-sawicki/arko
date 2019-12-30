@@ -1,24 +1,23 @@
 section .TEXT
 	global reduce_contrast
 reduce_contrast:
-	push ebp
-	mov ebp, esp
-	push ebx
-	mov eax, [ebp + 12] ; rfactor
-	shl eax, 1 ; rfactor / 128 in 8.8
+	push rbp
+	mov rbp, rsp
+	shl esi, 1 ; rfactor / 128 in 8.8
 	mov ecx, 256
-	sub ecx, eax ; 1 - rfactor / 128
-	mov ebx, ecx
+	sub ecx, esi; 1 - rfactor / 128
+	mov eax, ecx
 	shl ecx, 16
-	or ecx, ebx ; 2 words of (1 - rfactor / 128)
-	mov ebx, [ebp + 8] ; file buffer
-	mov edx, [ebx + 18] ; image width
-	add edx, 3
+	or ecx, eax; 2 words of (1 - rfactor / 128)
+	mov edx, [rdi + 18] ; image width
+	add edx, 3 
 	and edx, 0xFFFFFFFC; image width rounded to mul of 4
-	mov eax, [ebx + 22] ; image height
+	mov eax, [rdi + 22] ; image height
 	mul edx ; pixel amount
 	lea eax, [eax + eax * 2] ; 3 bytes per pixel
-	add ebx, [ebx + 10] ; pixel data offset
+	xor rdx, rdx
+	mov edx, [rdi + 10]
+	add rdi, rdx ; pixel data offset
 	mov edx, 0x00800080 ; 2 words of 128
 	movd xmm1, edx
 	pshufd xmm1, xmm1, 0 ; 8 words of 128
@@ -28,10 +27,10 @@ reduce_contrast:
 loop:
 	test eax, eax
 	je fin
-	movd xmm3, [ebx] ; get 4 bytes
+	movd xmm3, [rdi] ; get 4 bytes
 	cmp eax, 16
 	jl too_short
-	movdqu xmm3, [ebx] ; get 16 bytes if possible
+	movdqu xmm3, [rdi] ; get 16 bytes if possible
 too_short:
 	movdqu xmm4, xmm3
 	punpcklbw xmm4, xmm0 ; low 8 bytes extended into words
@@ -54,8 +53,8 @@ too_short:
 	cmp eax, 16
 	jge next_eight_bytes
 	packuswb xmm5, xmm0 ; convert words to bytes
-	movd [ebx], xmm5
-	add ebx, 4
+	movd [rdi], xmm5
+	add rdi, 4
 	sub eax, 4
 	jmp loop
 next_eight_bytes:
@@ -78,12 +77,11 @@ next_eight_bytes:
 	por xmm4, xmm6 ; all words
 
 	packuswb xmm5, xmm4 ; convert words back into bytes
-	movdqu [ebx], xmm5 ; store 16 bytes
+	movdqu [rdi], xmm5 ; store 16 bytes
 	sub eax, 16
-	add ebx, 16
+	add rdi, 16
 	jmp loop	 
 fin:
-	pop ebx
-	mov esp, ebp
-	pop ebp
+	mov rsp, rbp
+	pop rbp
 	ret

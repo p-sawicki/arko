@@ -14,5 +14,7 @@ int main(int argc, char **argv){
 	unsigned int rfactor = atoi(argv[2]);
 	reduce_contrast(d, rfactor);
 	fwrite(d, 1, size, f);
+	free(d);
+	fclose(f);
 	return 0;
 }
