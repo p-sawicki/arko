@@ -5,8 +5,7 @@ reduce_contrast:
 	mov ebp, esp
 
 	mov eax, [ebp + 12] ; rfactor
-	shl eax, 1 ; rfactor / 128 in 8.8
-	mov ecx, 256
+	mov ecx, 128 
 	sub ecx, eax ; 1 - rfactor / 128
 	mov edx, ecx
 	shl ecx, 16
@@ -37,59 +36,29 @@ too_short:
 	movdqu xmm4, xmm3
 	punpcklbw xmm4, xmm0 ; low 8 bytes extended into words
 
-	movdqu xmm5, xmm4
-	pcmpgtw xmm5, xmm1 ; mask for words > 128
-
-	movdqu xmm6, xmm4 ; words > 128
-	psubw xmm6, xmm1 ; pixel - 128
-	pmullw xmm6, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
-	psrlw xmm6, 8
-	paddw xmm6, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
-
-	movdqu xmm7, xmm1 ; words <= 128 in xmm4
-	psubw xmm7, xmm4 ; 128 - pixel
-	pmullw xmm7, xmm2 ; (1 - rfactor / 128) * (128 - pixel)
-	psrlw xmm7, 8
-	movdqu xmm4, xmm1
-	psubw xmm4, xmm7 ; 128 - (1 - rfactor / 128) * (128 - pixel)
-
-	pand xmm6, xmm5 ; words > 128
-	pandn xmm5, xmm4 ; words <= 128
-	por xmm5, xmm6 ; all words
+	psubw xmm4, xmm1 ; pixel - 128
+	pmullw xmm4, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
+	psraw xmm4, 7
+	paddw xmm4, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
 
 	cmp eax, 16
 	jge next_eight_bytes
 
-	packuswb xmm5, xmm0 ; convert words to bytes
-	movd [edx], xmm5
+	packuswb xmm4, xmm0 ; convert words to bytes
+	movd [edx], xmm4
 	add edx, 4
 	sub eax, 4
 	jmp loop
 next_eight_bytes:
 	punpckhbw xmm3, xmm0 ; high 8 bytes extended into words
 
-	movdqu xmm4, xmm3
-	pcmpgtw xmm4, xmm1 ; mask for words > 128
+	psubw xmm3, xmm1 ; pixel - 128
+	pmullw xmm3, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
+	psraw xmm3, 7
+	paddw xmm3, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
 
-	movdqu xmm6, xmm3 ; words > 128
-	psubw xmm6, xmm1 ; pixel - 128
-	pmullw xmm6, xmm2 ; (1 - rfactor / 128) * (pixel - 128)
-	psrlw xmm6, 8
-	paddw xmm6, xmm1 ; (1 - rfactor / 128) * (pixel - 128) + 128
-
-	movdqu xmm7, xmm1 ; words <= 128 in xmm3
-	psubw xmm7, xmm3 ; 128 - pixel
-	pmullw xmm7, xmm2 ; (1 - rfactor / 128) * (128 - pixel)
-	psrlw xmm7, 8
-	movdqu xmm3, xmm1
-	psubw xmm3, xmm7 ; 128 - (1 - rfactor / 128) * (128 - pixel)
-
-	pand xmm6, xmm4 ; words > 128
-	pandn xmm4, xmm3 ; words <= 128
-	por xmm4, xmm6 ; all words
-
-	packuswb xmm5, xmm4 ; convert words back into bytes
-	movdqu [edx], xmm5 ; store 16 bytes
+	packuswb xmm4, xmm3 ; convert words back into bytes
+	movdqu [edx], xmm4 ; store 16 bytes
 	sub eax, 16
 	add edx, 16
 	jmp loop	 
